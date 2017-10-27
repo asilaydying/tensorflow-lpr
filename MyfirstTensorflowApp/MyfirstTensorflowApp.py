@@ -6,16 +6,18 @@ import tensorflow as tf
 from PIL import Image
 import numpy as np
 
-car_pictures = "C:\\Dropbox (ASURA Technologies)\\ASURA-DEV\\video\\streamer\\video2\\"
+car_pictures = "C:\\Dropbox (ASURA Technologies)\\ASURA-DEV\\video\\streamer\\MVI_1521\\"
 
-plates_path = "C:\\temp\\plates1522.csv"
+plates_path = "C:\\temp\\plates.csv"
 
 # Define path to TensorBoard log files
 logPath = "C:\\temp\\tens"
+picture_pixel_size = 112
 
+number_of_picutres = 3000
+training_test_ratio = 0.99
+number_of_train_data = int(1000*training_test_ratio)
 
-
-number_of_train_data = 0
 
 cars = []
 carsfilename = []
@@ -44,12 +46,12 @@ for f in listdir(car_pictures):
         labels.append([1,0])
     im = Image.open(car_pictures + f)
     im = im.convert("L")
-    im = im.resize((28,28))
+    im = im.resize((picture_pixel_size,picture_pixel_size))
     pixel_values = list(im.getdata())
     cars.append(pixel_values)
     counter = counter + 1
-    #if (counter > 12000):
-    #    break
+    if (counter > number_of_picutres):
+        break
 
 print(len(cars))
 print(len(labels))
@@ -65,10 +67,10 @@ def variable_summaries(var):
     tf.summary.scalar('mean', mean)
     with tf.name_scope('stddev'):
       stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-    #tf.summary.scalar('stddev', stddev)
-    #tf.summary.scalar('max', tf.reduce_max(var))
-    #tf.summary.scalar('min', tf.reduce_min(var))
-    #tf.summary.histogram('histogram', var)
+    tf.summary.scalar('stddev', stddev)
+    tf.summary.scalar('max', tf.reduce_max(var))
+    tf.summary.scalar('min', tf.reduce_min(var))
+    tf.summary.histogram('histogram', var)
 
 
 # Using Interactive session makes it the default sessions so we do not need to pass sess 
@@ -77,14 +79,14 @@ sess = tf.InteractiveSession()
 
 # Define placeholders for MNIST input data
 with tf.name_scope("MNIST_Input"):
-    x = tf.placeholder(tf.float32, shape=[None, 784], name="x")
+    x = tf.placeholder(tf.float32, shape=[None, picture_pixel_size*picture_pixel_size], name="x")
     y_ = tf.placeholder(tf.float32, [None, 2], name="y_")  
 
 # change the MNIST input data from a list of values to a 28 pixel X 28 pixel X 1 grayscale value cube
 #    which the Convolution NN can use.
 with tf.name_scope("Input_Reshape"):
-    x_image = tf.reshape(x, [-1,28,28,1], name="x_image")
-    #tf.summary.image('input_img', x_image, 5)
+    x_image = tf.reshape(x, [-1,picture_pixel_size,picture_pixel_size,1], name="x_image")
+    tf.summary.image('input_img', x_image, 5)
 
 # We are using RELU as our activation function.  These must be initialized to a small positive number 
 # and with some noise so you don't end up going to zero when comparing diffs
@@ -141,10 +143,11 @@ with tf.name_scope('Conv2'):
 
 with tf.name_scope('FC'):
     # Fully Connected Layer
-    W_fc1 = weight_variable([7 * 7 * 64, 1024], name="weight")
+    size_after_pool2 = int((picture_pixel_size/4) * (picture_pixel_size/4))
+    W_fc1 = weight_variable([size_after_pool2 * 64, 1024], name="weight")
     b_fc1 = bias_variable([1024], name="bias")
     #   Connect output of pooling layer 2 as input to full connected layer
-    h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
+    h_pool2_flat = tf.reshape(h_pool2, [-1, size_after_pool2*64])
     h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1, name="relu")
 
 # dropout some neurons to reduce overfitting
@@ -192,26 +195,26 @@ tbWriter = tf.summary.FileWriter(logPath, sess.graph)
 import time
 
 #  define number of steps and how often we display progress
-num_steps = 150
+num_steps = 250
 display_every = 5
 
 # Start timer
 start_time = time.time()
 end_time = time.time()
-#for i in range(num_steps):
-#    _, summary = sess.run([train_step, summarize_all], feed_dict={x: cars[:number_of_train_data], y_: labels[:number_of_train_data], keep_prob: 0.5})
-#    tbWriter.add_summary(summary,i)
+for i in range(num_steps):
+    _, summary = sess.run([train_step, summarize_all], feed_dict={x: cars[:number_of_train_data], y_: labels[:number_of_train_data], keep_prob: 0.5})
+    tbWriter.add_summary(summary,i)
 
-#    # Periodic status display
-#    if i%display_every == 0:
-#        train_accuracy = accuracy.eval(feed_dict={
-#            x:cars[:number_of_train_data], y_: labels[:number_of_train_data], keep_prob: 1.0})
-#        end_time = time.time()
-#        print("step {0}, elapsed time {1:.2f} seconds, training accuracy {2:.3f}%".format(i, end_time-start_time, train_accuracy*100.0))
-        # write summary to log
-        #tbWriter.add_summary(summary,i)
-#save_path = saver.save(sess, "c:\\temp\\model.ckpt")
-saver.restore(sess, "c:\\temp\\model.ckpt")
+    # Periodic status display
+    if i%display_every == 0:
+        train_accuracy = accuracy.eval(feed_dict={
+            x:cars[:number_of_train_data], y_: labels[:number_of_train_data], keep_prob: 1.0})
+        end_time = time.time()
+        print("step {0}, elapsed time {1:.2f} seconds, training accuracy {2:.3f}%".format(i, end_time-start_time, train_accuracy*100.0))
+         
+        tbWriter.add_summary(summary,i)
+save_path = saver.save(sess, "c:\\temp\\model.ckpt")
+#saver.restore(sess, "c:\\temp\\model.ckpt")
 # Display summary 
 #     Time to train
 end_time = time.time()
